@@ -178,6 +178,9 @@ private:
 
     std::shared_ptr<state<future_t>> state_;
 
+private:
+    template<typename> struct is_future : std::false_type {};
+    template<typename T> struct is_future<future<T>> : std::true_type {};
 public:
 
     template<class ...ARGS>
@@ -239,9 +242,73 @@ public:
         return state_ != nullptr;
     }
 
-    template <class callback_t, class return_t = typename std::result_of<callback_t(future_t)>::type>
-    auto then(callback_t cb_function) -> return_t;
+    //function that returns void
+    template <class callback_t,
+            class return_t = typename std::result_of<callback_t(future_t)>::type,
+            typename  = typename std::enable_if<std::is_void<return_t>::value >::type
+    >
+    void then(callback_t cb_function){
+        if (!state_)
+            throw std::future_error{std::future_errc::no_state};
 
+        state_->then([cb_function = std::move(cb_function)](std::shared_ptr<state<future_t>> state) mutable {
+            g_default_executor([cb_function = std::move(cb_function), state = std::move(state)]() mutable {
+                cb_function(future<future_t> {state});
+            });
+        });
+    }
+
+    //function that returns a non future value
+    template <class callback_t,
+            class inner_return_t = typename std::result_of<callback_t(future_t)>::type,
+            class return_t = future<inner_return_t>,
+            typename  = typename std::enable_if<!std::is_void<inner_return_t>::value >::type,
+            typename  = typename std::enable_if<!is_future<inner_return_t>::value>::type
+    >
+    return_t then(callback_t cb_function) {
+        if (!state_)
+            throw std::future_error{std::future_errc::no_state};
+
+        auto ret_state = std::make_shared<state<inner_return_t>>();
+
+        state_->then([cb_function = std::move(cb_function), ret_state](std::shared_ptr<state<future_t>> state) mutable {
+            g_default_executor([cb_function = std::move(cb_function), state = std::move(state), ret_state = std::move(ret_state)]() mutable {
+                ret_state->set_value(cb_function(future<future_t> {state}));
+
+            });
+        });
+
+        return return_t {ret_state};
+    }
+
+    // function that returns a ns::future
+    template <class callback_t,
+            class return_t = typename std::result_of<callback_t(future_t)>::type,
+            class inner_return_t = typename return_t::type,
+            typename  = typename std::enable_if<is_future<return_t>::value>::type
+    >
+    return_t then(callback_t cb_function) {
+        static_assert(std::is_same<return_t, ns::future<double>>::value, "qwert");
+        static_assert(std::is_same<inner_return_t,double>::value, "qewr");
+
+        if (!state_)
+            throw std::future_error{std::future_errc::no_state};
+
+        auto ret_state = std::make_shared<state<inner_return_t>>();
+
+        state_->then([cb_function = std::move(cb_function), ret_state](std::shared_ptr<state<future_t>> state) mutable {
+            g_default_executor([cb_function = std::move(cb_function), state = std::move(state), ret_state = std::move(ret_state)]() mutable {
+                return_t rt = cb_function(future<future_t> {state});
+                rt.then([ret_state = std::move(ret_state)](return_t r){
+                    ret_state->set_value(r.get());
+                });
+                //ret_state->set_value
+
+            });
+        });
+
+        return return_t {ret_state};
+    }
 };
 
 template<class TYPE, class ...ARGS>
@@ -294,10 +361,11 @@ public:
 
 };
 
+/*
 template<class future_t>
 template<class callback_t, class return_t>
 auto future<future_t>::then(callback_t cb_function) -> return_t {
-    static_assert(std::is_same<return_t, void>::value, "is null");
+    static_assert(!std::is_same<return_t, void>::value, "is null");
 
     if (!state_)
         throw std::future_error{std::future_errc::no_state};
@@ -308,5 +376,6 @@ auto future<future_t>::then(callback_t cb_function) -> return_t {
         });
     });
 }
+*/
 
 }

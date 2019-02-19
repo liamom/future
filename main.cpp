@@ -30,42 +30,67 @@ int run_doctest(int argc, char *argv[]) {
         return res;
 }
 
+
 int main(int argc, char *argv[]) {
     int res = run_doctest(argc, argv);
-//    future<int> f;
-//    assert(!f.valid());
-//
-//    promise<int> p;
-//    f = p.get_future();
-//    f.then<int>([](future<int> f) {
-//        std::cout << "1: " << f.get() << std::endl;
-//
-//        return 5;
-//    });
-//
-//    p.set_value(10);
-//
-//    promise<void> p2;
-//    p2.get_future().then<void>([](future<void> future1){
-//       std::cout << "thing";
-//    });
 
-//    promise<int> p;
-//    future<int> f = p.get_future();
-//    p.set_value(5);
-//    f.then([](future<int> f) {
-//        std::cout << "blarg: \'" << f.get() << "\'" << std::endl;
-//    });
+//    {
+//        future<int> f;
+//        assert(!f.valid());
+//
+//        promise<int> p;
+//        f = p.get_future();
+//        auto f2 = f.then([](future<int> f) {
+//            std::cout << "1: " << f.get() << std::endl;
+//
+//            return 5;
+//        });
+//
+//
+//        std::thread th([&]() {
+//            std::this_thread::sleep_for(2s);
+//            std::cout << "calling set value" << std::endl;
+//            p.set_value(10);
+//        });
+//
+//        std::cout << "f2.get() = " << f2.get() << std::endl;
+//
+//        th.join();
+//    }
 
-    std::promise<int> p2;
-    p2.set_value(5);
-    std::cout << "test: " << p2.get_future().get() << std::endl;
+    {
+        future<int> f;
+        assert(!f.valid());
 
-    ns::promise<int> p3;
-    auto f3 = p3.get_future();
-    f3.wait_for(1ms);
+        promise<int> p;
+        promise<double> p2;
+        f = p.get_future();
+        future<double> f2 = f.then([&](future<int> f) -> future<double> {
+            std::cout << "1: " << f.get() << std::endl;
 
-//    std::this_thread::sleep_for(1s);
-    std::cout << "Hello, World!" << std::endl;
+            return p2.get_future();
+        });
+
+        auto f3 = f2.then([](future<double> f){
+            std::cout << "12: " << f.get() << std::endl;
+            return 1234;
+        });
+
+
+        std::thread th([&](){
+            std::this_thread::sleep_for(2s);
+            std::cout << "calling set value" << std::endl;
+            p.set_value(10);
+
+            std::this_thread::sleep_for(2s);
+            std::cout << "calling set value2" << std::endl;
+            p2.set_value(5.5);
+        });
+
+        std::cout << "f3.get() = " << f3.get() << std::endl;
+
+        th.join();
+    }
+
     return res;
 }
