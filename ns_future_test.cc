@@ -1,5 +1,7 @@
 #include <future>
-#include "ns_future.h"
+
+#define LOM_FUTURE_IMPLEMENT
+#include "lom/future.h"
 
 #define DOCTEST_CONFIG_IMPLEMENT
 #include "doctest.h"
@@ -12,20 +14,20 @@ namespace {
 class fixture {
 public:
     fixture() {
-        ns::g_default_executor = [](auto f) {
+        lom::g_default_executor = [](auto f) {
             f();
         };
     }
 
     ~fixture() {
-        ns::g_default_executor = ns::default_executor_impl;
+        lom::g_default_executor = lom::default_executor_impl;
     }
 };
 }
 
 TEST_SUITE("future and promise") {
 
-TEST_CASE_TEMPLATE ("test basics", T, std::promise<int>, ns::promise<int>) {
+TEST_CASE_TEMPLATE ("test basics", T, std::promise<int>, lom::promise<int>) {
     fixture fix;
     T p;
     SUBCASE("set value first") {
@@ -42,7 +44,7 @@ TEST_CASE_TEMPLATE ("test basics", T, std::promise<int>, ns::promise<int>) {
     }
 }
 
-TEST_CASE_TEMPLATE ("double set exception", T, std::promise<int>, ns::promise<int>) {
+TEST_CASE_TEMPLATE ("double set exception", T, std::promise<int>, lom::promise<int>) {
     fixture fix;
     T p;
     auto type_str = typeid(p).name();
@@ -80,7 +82,7 @@ TEST_CASE_TEMPLATE ("double set exception", T, std::promise<int>, ns::promise<in
 
 
 TEST_CASE_FIXTURE (fixture, "test then") {
-    ns::promise<int> p;
+    lom::promise<int> p;
     auto f = p.get_future();
     bool called = false;
 
@@ -88,7 +90,7 @@ TEST_CASE_FIXTURE (fixture, "test then") {
         p.set_value(5);
     }
 
-    f.then([&called](ns::future<int> t) {
+    f.then([&called](lom::future<int> t) {
         CHECK(t.get() == 5);
         called = true;
     });
@@ -107,21 +109,21 @@ TEST_CASE("test then async" * doctest::timeout(0.500)) {
         std::thread::id id = std::this_thread::get_id();
     } static_test_data;
 
-    ns::g_default_executor = [](auto cb) {
+    lom::g_default_executor = [](auto cb) {
         CHECK(static_test_data.id == std::this_thread::get_id());
         static_test_data.call_back = cb;
     };
 
     auto end = gsl::finally([](){
-        ns::g_default_executor = ns::default_executor_impl;
+        lom::g_default_executor = lom::default_executor_impl;
     });
 
-    ns::promise<int> p;
+    lom::promise<int> p;
     auto f = p.get_future();
 
     std::promise<void> waiter;
 
-    f.then([&waiter](ns::future<int> t) {
+    f.then([&waiter](lom::future<int> t) {
         CHECK(t.get() == 5);
         CHECK(static_test_data.id == std::this_thread::get_id());
         waiter.set_value();

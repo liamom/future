@@ -1,11 +1,11 @@
 #include <iostream>
 #include <future>
-#include "ns_future.h"
+#include "lom/future.h"
 #include <chrono>
 #include <doctest.h>
 using namespace std::chrono_literals;
 
-using namespace ns;
+using namespace lom;
 
 int run_doctest(int argc, char *argv[]) {
     doctest::Context context;

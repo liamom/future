@@ -7,7 +7,7 @@
 
 #include <thread>
 
-namespace ns {
+namespace lom {
 
 using executor_t = void (*)(std::function<void()>);
 auto default_executor_impl = [](std::function<void()> f) {
@@ -15,6 +15,19 @@ auto default_executor_impl = [](std::function<void()> f) {
 };
 
 extern executor_t g_default_executor;
+
+//
+//
+/**
+ * used to make the library header only. You'll need to add the following in 1 file in an app to use the continuation feature
+ * ```
+ * #define LOM_FUTURE_IMPLEMENT
+ * #include "lom/future.h"
+ * ```
+ */
+#ifdef LOM_FUTURE_IMPLEMENT
+executor_t g_default_executor = default_executor_impl;
+#endif
 
 template<class TYPE>
 class state : public std::enable_shared_from_this<state<TYPE>> {
@@ -281,14 +294,14 @@ public:
         return return_t {ret_state};
     }
 
-    // function that returns a ns::future
+    // function that returns a lom::future
     template <class callback_t,
             class return_t = typename std::result_of<callback_t(future_t)>::type,
             class inner_return_t = typename return_t::type,
             typename  = typename std::enable_if<is_future<return_t>::value>::type
     >
     return_t then(callback_t cb_function) {
-        static_assert(std::is_same<return_t, ns::future<double>>::value, "qwert");
+        static_assert(std::is_same<return_t, lom::future<double>>::value, "qwert");
         static_assert(std::is_same<inner_return_t,double>::value, "qewr");
 
         if (!state_)
